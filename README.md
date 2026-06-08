@@ -1,4 +1,4 @@
-Linkit — Fundability Analyser
+Fundability Analyser
 An AI-powered bank statement analyser that scores UAE SME funding readiness in seconds.
 
 What It Does
