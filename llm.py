@@ -129,27 +129,27 @@ def call_openrouter(
 
     for try_model in models_to_try:
         for key in keys:
-            for attempt in range(max_retries):
-                try:
-                    r = _post_openrouter(key, try_model, system, user_content, max_tokens)
-                    if r.status_code == 429:
-                        last_err = "rate_limited_429"
-                        time.sleep(retry_delay)
-                        continue
-                    if r.status_code in (404, 502, 503):
-                        last_err = r.text[:200]
-                        break
-                    if r.status_code != 200:
-                        return {"error": r.text[:200], "text": "", "model_used": try_model}
-                    choices = r.json().get("choices") or []
-                    if not choices:
-                        last_err = "empty_response"
-                        break
-                    text = choices[0]["message"]["content"]
-                    return {"text": text, "model_used": try_model}
-                except Exception as e:
-                    last_err = str(e)
-                    if attempt + 1 < max_retries:
-                        time.sleep(retry_delay)
+            try:
+                r = _post_openrouter(key, try_model, system, user_content, max_tokens)
+                if r.status_code == 429:
+                    last_err = "rate_limited_429"
                     continue
+                if r.status_code in (401, 403):
+                    last_err = f"auth_error_{r.status_code}"
+                    continue
+                if r.status_code in (404, 502, 503):
+                    last_err = r.text[:200]
+                    continue
+                if r.status_code != 200:
+                    last_err = r.text[:200]
+                    continue
+                choices = r.json().get("choices") or []
+                if not choices:
+                    last_err = "empty_response"
+                    continue
+                text = choices[0]["message"]["content"]
+                return {"text": text, "model_used": try_model}
+            except Exception as e:
+                last_err = str(e)
+                continue
     return {"error": last_err, "text": "", "model_used": model}
