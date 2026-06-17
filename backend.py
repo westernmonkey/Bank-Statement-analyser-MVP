@@ -40,7 +40,35 @@ BLOCK_SPLITTERS = {
     "enbd":          r"(?=\d{2}[A-Z]{3}\d{2}\s)",
     "rak":           r"(?=\d{2}-[A-Z]{3}-\d{4}\s)",
     "wio":           r"(?=\d{2}/\d{2}/\d{4}\s+P\d+)",
+    "generic":       r"(?=\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s|\d{1,2}-[A-Z]{3}-\d{4}\s|\d{2}[A-Z]{3}\d{2}\s)",
 }
+
+GENERIC_LINE_DATE_RE = re.compile(
+    r"^(\d{1,2}/\d{1,2}/\d{2,4}|\d{1,2}-[A-Z]{3}-\d{4}|\d{2}[A-Z]{3}\d{2})\s",
+    re.IGNORECASE,
+)
+
+BANK_NAME_PATTERNS = (
+    (r"Emirates NBD", "Emirates NBD"),
+    (r"First Abu Dhabi|FAB", "FAB"),
+    (r"Dubai Islamic|DIB", "Dubai Islamic Bank"),
+    (r"Abu Dhabi Commercial|ADCB", "ADCB"),
+    (r"RAKBANK|Ras Al Khaimah", "RAKBank"),
+    (r"Wio Bank", "Wio Bank"),
+    (r"Mashreq", "Mashreq"),
+    (r"Commercial Bank of Dubai|CBD", "CBD"),
+    (r"HSBC", "HSBC"),
+    (r"Standard Chartered", "Standard Chartered"),
+    (r"National Bank of Fujairah|NBF", "NBF"),
+    (r"United Arab Bank|UAB", "UAB"),
+    (r"Bank of Sharjah", "Bank of Sharjah"),
+    (r"Sharjah Islamic", "Sharjah Islamic Bank"),
+    (r"Abu Dhabi Islamic|ADIB", "ADIB"),
+    (r"Al Hilal Bank", "Al Hilal Bank"),
+    (r"National Bank of Umm Al Qaiwain|NBQ", "NBQ"),
+    (r"Citibank", "Citibank"),
+    (r"Emirates Islamic", "Emirates Islamic Bank"),
+)
 
 
 def parse_date(text: str):
@@ -113,7 +141,32 @@ def detect_bank(full_text: str, page1: str) -> str:
         re.IGNORECASE,
     ):
         return "adcb_legacy"
-    return "unknown"
+    return "generic"
+
+
+def infer_bank_display_name(full_text: str) -> str:
+    """Best-effort bank label when no dedicated parser is matched."""
+    for pattern, label in BANK_NAME_PATTERNS:
+        if re.search(pattern, full_text, re.IGNORECASE):
+            return label
+    return "Bank Statement"
+
+
+def extract_blocks_line_joined_generic(full_text: str) -> list:
+    """Join multiline transactions for unknown banks using common date prefixes."""
+    blocks = []
+    current = []
+    for line in full_text.split("\n"):
+        stripped = line.strip()
+        if GENERIC_LINE_DATE_RE.match(stripped):
+            if current:
+                blocks.append("\n".join(current))
+            current = [stripped]
+        elif current:
+            current.append(stripped)
+    if current:
+        blocks.append("\n".join(current))
+    return [b for b in blocks if re.findall(r"[\d,]+\.\d{2}", b)]
 
 
 def extract_blocks_line_joined(full_text: str) -> list:
@@ -146,6 +199,18 @@ def extract_raw_blocks(pages: list, bank: str) -> list:
 
     if bank == "adcb_legacy":
         return extract_blocks_line_joined(full_text)
+
+    if bank == "generic":
+        blocks = extract_blocks_line_joined_generic(full_text)
+        if len(blocks) >= 2:
+            return blocks
+        splitter = BLOCK_SPLITTERS["generic"]
+        blocks = re.split(splitter, full_text)
+        return [
+            b for b in blocks
+            if re.search(r"[\d,]+\.\d{2}", b)
+            and GENERIC_LINE_DATE_RE.match(b.strip())
+        ]
 
     splitter = BLOCK_SPLITTERS.get(bank)
     if not splitter:
@@ -423,6 +488,84 @@ def parse_header_wio(pages: list, full_text: str) -> dict:
     return result
 
 
+def parse_header_generic(full_text: str, page1: str, raw_blocks: list) -> dict:
+    """Heuristic header parser for banks without a dedicated layout."""
+    credit_patterns = (
+        r"Total Credit Amount[:\s]+([\d,]+\.?\d*)",
+        r"Total Credits?[:\s]+AED\s*([\d,]+\.?\d*)",
+        r"Total Credits?[:\s]+([\d,]+\.?\d*)",
+        r"Total Deposits\s+AED\s*([\d,]+\.?\d*)",
+        r"Total Deposits[:\s]+([\d,]+\.?\d*)",
+    )
+    debit_patterns = (
+        r"Total Debit Amount[:\s]+([\d,]+\.?\d*)",
+        r"Total Debits?[:\s]+AED\s*([\d,]+\.?\d*)",
+        r"Total Debits?[:\s]+([\d,]+\.?\d*)",
+        r"Total Withdrawals\s+AED\s*([\d,]+\.?\d*)",
+        r"Total Withdrawals[:\s]+([\d,]+\.?\d*)",
+    )
+    opening_patterns = (
+        r"Opening Balance[:\s]+AED\s*([\d,]+\.?\d*)",
+        r"Opening Balance[:\s]+([\d,]+\.?\d*)",
+        r"Opening\s*\(Available\)\s*Balance[:\s]+([\d,]+\.?\d*)",
+    )
+    closing_patterns = (
+        r"Closing\(Available\)\s*Balance[:\s]+([\d,]+\.?\d*)",
+        r"Closing Balance[:\s]+AED\s*([\d,]+\.?\d*)",
+        r"Closing Balance[:\s]+([\d,]+\.?\d*)",
+        r"Available Balance[:\s]+([\d,]+\.?\d*)",
+    )
+
+    def first_match(patterns: tuple[str, ...]) -> float:
+        for pat in patterns:
+            val = pnum(full_text, pat)
+            if val:
+                return val
+        return 0.0
+
+    total_credit = first_match(credit_patterns)
+    total_debit = first_match(debit_patterns)
+    opening_bal = first_match(opening_patterns)
+    closing_bal = first_match(closing_patterns)
+    num_credits = int(pnum(full_text, r"Total no of credits[:\s]+(\d+)")) or 0
+    num_debits = int(pnum(full_text, r"Total no of debits[:\s]+(\d+)")) or 0
+    avg_balance = pnum(full_text, r"Average Balance[:\s]+([\d,]+\.?\d*)")
+
+    period_months = 6
+    period_patterns = (
+        r"Start Date[:\s]+(\d{2}-\w+-\d{4}).*?End Date[:\s]+(\d{2}-\w+-\d{4})",
+        r"FROM\s+(\d{2}/\d{2}/\d{4})\s+TO\s+(\d{2}/\d{2}/\d{4})",
+        r"Statement Period[:\s]+(\d{2}/\d{2}/\d{4})\s+To\s+(\d{2}/\d{2}/\d{4})",
+        r"Statement Period:\s+(\d{2}-\w+-\d{4})\s+to\s+(\d{2}-\w+-\d{4})",
+        r"Period[:\s]+(\d{2}/\d{2}/\d{4})\s*[-–]\s*(\d{2}/\d{2}/\d{4})",
+    )
+    for pat in period_patterns:
+        m = re.search(pat, full_text, re.IGNORECASE | re.DOTALL)
+        if m:
+            period_months = period_months_from_dates(m.group(1), m.group(2))
+            break
+
+    if not (total_credit or total_debit) and raw_blocks:
+        bf_m = re.search(r"(\d{2}/\d{2}/\d{4})\s+B/F[^\d]*([\d,]+\.\d{2})", page1)
+        if bf_m and not opening_bal:
+            opening_bal = float(bf_m.group(2).replace(",", ""))
+        tc, td, nc, nd = sum_from_balance_blocks(raw_blocks, opening_bal or None)
+        total_credit = total_credit or tc
+        total_debit = total_debit or td
+        num_credits = num_credits or nc
+        num_debits = num_debits or nd
+
+    if not closing_bal:
+        amounts = re.findall(r"([\d,]+\.\d{2})\s*$", full_text, re.MULTILINE)
+        if amounts:
+            closing_bal = float(amounts[-1].replace(",", ""))
+
+    return build_header(
+        total_credit, total_debit, closing_bal, opening_bal,
+        period_months, num_credits, num_debits, avg_balance,
+    )
+
+
 def parse_header(full_text: str, pages: list, bank: str, raw_blocks: list) -> dict:
     page1 = pages[0]
     parsers = {
@@ -431,6 +574,7 @@ def parse_header(full_text: str, pages: list, bank: str, raw_blocks: list) -> di
         "enbd":          lambda: parse_header_enbd(full_text, page1, raw_blocks),
         "rak":           lambda: parse_header_rak(page1, raw_blocks),
         "wio":           lambda: parse_header_wio(pages, full_text),
+        "generic":       lambda: parse_header_generic(full_text, page1, raw_blocks),
     }
     return parsers.get(bank, lambda: {})()
 
@@ -448,6 +592,7 @@ def extract_transaction_blocks(pages: list, bank: str) -> list:
         "enbd":        r"\d{2}[A-Z]{3}\d{2}",
         "rak":         r"\d{2}-[A-Z]{3}-\d{4}",
         "wio":         r"\d{2}/\d{2}/\d{4}\s+P\d+",
+        "generic":     r"\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}-[A-Z]{3}-\d{4}|\d{2}[A-Z]{3}\d{2}",
     }.get(bank, r".")
     return [
         b[:250] for b in raw
@@ -463,8 +608,14 @@ BANK_LABELS = {
     "rak":           "RAKBank",
     "wio":           "Wio Bank",
     "mashreq":       "Mashreq",
-    "unknown":       "Unknown",
+    "generic":       "Bank Statement",
 }
+
+
+def bank_display_name(bank_id: str, full_text: str) -> str:
+    if bank_id == "generic":
+        return infer_bank_display_name(full_text)
+    return BANK_LABELS.get(bank_id, infer_bank_display_name(full_text))
 
 
 # ── TRANSACTION PARSER (all banks) ──────────────────────────────
@@ -919,13 +1070,13 @@ def analyse():
             return jsonify({"error": "PDF appears to be empty or unreadable."}), 400
 
         full_text = "\n".join(pages)
-        bank = detect_bank(full_text, pages[0])
-
-        if bank == "unknown":
+        if not full_text.strip():
             return jsonify({
-                "error": "Could not identify the bank from this PDF. "
-                         "Supported banks: ADCB, Emirates NBD, RAKBank, Wio Bank, Mashreq."
+                "error": "This PDF has no selectable text — it looks like a scanned image. "
+                         "Please upload a digital PDF exported from your bank (not a photo scan)."
             }), 400
+
+        bank = detect_bank(full_text, pages[0])
 
         raw_blocks = extract_raw_blocks(pages, bank)
         blocks = extract_transaction_blocks(pages, bank)
@@ -933,8 +1084,8 @@ def analyse():
 
         if header.get("total_credits_6m", 0) == 0 and header.get("closing_balance", 0) == 0:
             return jsonify({
-                "error": f"Could not extract financial data from this {BANK_LABELS[bank]} statement. "
-                         "Make sure the PDF is a complete, unprotected bank statement."
+                "error": "Could not extract financial data from this statement. "
+                         "Make sure the PDF is a complete, unprotected bank statement with selectable text."
             }), 400
 
         transactions = parse_transactions(
@@ -942,7 +1093,7 @@ def analyse():
         )
 
         metrics = {
-            "bank":             BANK_LABELS[bank],
+            "bank":             bank_display_name(bank, full_text),
             "aecb":             aecb,
             "months_in_business": months,
             **header,
