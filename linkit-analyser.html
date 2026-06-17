@@ -739,7 +739,7 @@
       <h4>Improve your fundability score</h4>
       <p>Book a free 30-minute call with our team to understand what lenders look for and how to strengthen your application.</p>
     </div>
-    <a class="consult-btn" href="https://calendly.com/abhinav-letslinkit/30min" target="_blank" rel="noopener">Book Free Consultation</a>
+    <a class="consult-btn" href="https://calendly.com/letslinkit-to-abhinav" target="_blank" rel="noopener">Book Free Consultation</a>
   </div>
 
   <div class="results-body">
@@ -768,7 +768,7 @@
           <div class="lock-icon">🔒</div>
           <h4>Deeper Insights Available</h4>
           <p>Unlock the full risk breakdown and get a personalised plan to improve your fundability score.</p>
-          <a class="consult-btn" href="https://calendly.com/abhinav-letslinkit/30min" target="_blank" rel="noopener">Book Free Consultation →</a>
+          <a class="consult-btn" href="https://calendly.com/letslinkit-to-abhinav" target="_blank" rel="noopener">Book Free Consultation →</a>
         </div>
       </div>
     </div>
@@ -1004,40 +1004,67 @@ function escHtml(s) {
 }
 
 function buildExportHtml(data) {
-  const score = Number(data.score) || 0;
+  const CALENDLY_URL = 'https://calendly.com/letslinkit-to-abhinav';
+  const score = Math.min(100, Math.max(0, Number(data.score) || 0));
   const metricRows = data.metrics.map(mt => `
-    <tr><td class="lbl">${escHtml(mt.label)}</td><td class="val">${escHtml(mt.value)}</td><td class="val" style="width:28%">${escHtml(mt.flag)}</td></tr>`
+    <tr><td class="lbl">${escHtml(mt.label)}</td><td class="val">${escHtml(mt.value)}</td><td class="val assess">${escHtml(mt.flag)}</td></tr>`
   ).join('');
   const obsRows = data.healthNotes.map((n, i) => `
-    <tr><td class="lbl">Observation ${i + 1}</td><td class="val" colspan="2">${escHtml(n)}</td></tr>
+    <tr><td class="lbl">Obs. ${i + 1}</td><td class="val" colspan="2">${escHtml(n)}</td></tr>
   `).join('');
 
   return `<!DOCTYPE html><html><head><title>Linkit Fundability Report</title>
 <style>
-  @page { margin: 18mm; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 13px; margin: 36px; color: #000; }
-  h2 { text-align: center; font-size: 18px; margin: 0 0 4px; color: #222; }
-  .brand { text-align: center; font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: #666; margin-bottom: 2px; }
-  .sub { text-align: center; font-size: 12px; margin-bottom: 18px; color: #555; }
-  .date-line { text-align: right; margin-bottom: 14px; font-size: 12px; color: #444; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-  td { padding: 8px 12px; vertical-align: top; }
-  .sh td { background: #333; color: #fff; font-weight: bold; padding: 7px 12px; font-size: 12px; }
-  .lbl { width: 34%; font-weight: 600; background: #f0f0f0; border: 1px solid #bbb; color: #222; }
-  .val { border: 1px solid #bbb; background: #fff; }
-  .score-wrap { margin: 16px 0 20px; padding: 16px; border: 1px solid #bbb; background: #fafafa; }
-  .score-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
-  .score-num { font-size: 28px; font-weight: bold; color: #111; }
-  .score-verdict { font-size: 14px; font-weight: bold; color: #333; }
-  .score-sub { font-size: 12px; color: #555; margin-top: 4px; }
-  .bar-track { height: 16px; background: #e8e8e8; border: 1px solid #999; position: relative; }
-  .bar-fill { height: 100%; background: #555; width: ${score}%; }
-  .bar-labels { display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 5px; }
-  .cta { margin-top: 18px; padding: 14px; border: 2px solid #333; background: #f5f5f5; font-size: 12px; line-height: 1.55; }
-  .cta strong { display: block; font-size: 13px; margin-bottom: 6px; }
-  .foot { margin-top: 16px; font-size: 10px; color: #777; text-align: center; }
-  @media print { body { margin: 0; } }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+  @page { size: A4 portrait; margin: 10mm 12mm; }
+  html, body { height: 100%; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 9.5px;
+    line-height: 1.35;
+    margin: 0;
+    padding: 0;
+    color: #000;
+  }
+  h2 { text-align: center; font-size: 14px; margin: 0 0 2px; color: #222; }
+  .brand { text-align: center; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #666; }
+  .sub { text-align: center; font-size: 9.5px; margin: 0 0 8px; color: #555; }
+  .date-line { text-align: right; margin-bottom: 6px; font-size: 9px; color: #444; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 7px; }
+  td { padding: 3px 7px; vertical-align: top; font-size: 9.5px; }
+  .sh td { background: #333 !important; color: #fff !important; font-weight: bold; padding: 4px 7px; font-size: 9px; }
+  .lbl { width: 32%; font-weight: 600; background: #ececec !important; border: 1px solid #aaa; color: #222; }
+  .val { border: 1px solid #aaa; background: #fff; }
+  .assess { width: 22%; }
+  .score-wrap { margin: 0 0 8px; padding: 8px 10px; border: 1px solid #aaa; background: #f7f7f7 !important; }
+  .score-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+  .score-num { font-size: 20px; font-weight: bold; color: #111; line-height: 1; }
+  .score-verdict { font-size: 11px; font-weight: bold; color: #333; }
+  .score-sub { font-size: 9px; color: #555; margin-bottom: 6px; }
+  .bar-svg { display: block; width: 100%; height: 12px; margin-top: 2px; }
+  .bar-labels { display: flex; justify-content: space-between; font-size: 8px; color: #666; margin-top: 3px; }
+  .cta {
+    margin-top: 6px;
+    padding: 8px 10px;
+    border: 1.5px solid #333;
+    background: #f3f3f3 !important;
+    font-size: 9px;
+    line-height: 1.45;
+  }
+  .cta strong { font-size: 10px; }
+  .cta a {
+    color: #1a4fb8;
+    font-weight: bold;
+    text-decoration: underline;
+    font-size: 10px;
+  }
+  .foot { margin-top: 6px; font-size: 8px; color: #777; text-align: center; }
+  @media print {
+    body { margin: 0; padding: 0; }
+    .page { page-break-after: avoid; page-break-inside: avoid; }
+  }
 </style></head><body>
+<div class="page">
 <div class="date-line">Date: ${escHtml(data.date)}</div>
 <div class="brand">Linkit</div>
 <h2>Fundability Analysis Report</h2>
@@ -1049,10 +1076,11 @@ function buildExportHtml(data) {
     <div class="score-verdict">${escHtml(data.verdict)}</div>
   </div>
   <div class="score-sub">${escHtml(data.sub)}</div>
-  <div style="margin-top:12px">
-    <div class="bar-track"><div class="bar-fill"></div></div>
-    <div class="bar-labels"><span>0 — Low</span><span>45 — Moderate</span><span>70 — Strong</span><span>100</span></div>
-  </div>
+  <svg class="bar-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+    <rect x="0" y="0" width="100" height="12" fill="#dedede" stroke="#888" stroke-width="0.5"/>
+    <rect x="0" y="0" width="${score}" height="12" fill="#444444"/>
+  </svg>
+  <div class="bar-labels"><span>0 Low</span><span>45 Mod.</span><span>70 Strong</span><span>100</span></div>
 </div>
 
 <table>
@@ -1068,11 +1096,11 @@ function buildExportHtml(data) {
 <div class="cta">
   <strong>Next Steps</strong>
   Want to improve your fundability score and understand what UAE lenders look for in detail?
-  Book a free 30-minute consultation with the Linkit team.<br><br>
-  <strong>Book here:</strong> https://calendly.com/abhinav-letslinkit/30min
+  <a href="${CALENDLY_URL}">Book your free 30-minute consultation with Abhinav at Linkit →</a>
 </div>
 
 <p class="foot">Indicative analysis only. Not a credit assessment or guarantee of funding.</p>
+</div>
 </body></html>`;
 }
 
