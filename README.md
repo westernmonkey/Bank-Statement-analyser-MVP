@@ -39,6 +39,14 @@ python backend.py
 # Runs on http://localhost:5001
 
 # 4. Open linkit-analyser.html in your browser
+
+Admin log — each successful analysis writes to:
+- `admin_analyses.json` — formatted JSON array with tabular sections (`metrics_table`, `score`, `company`, etc.)
+- `admin_analyses.log` — tabular text report (company, score, metrics table)
+- `admin_analyses.jsonl` — one JSON object per line (machine-readable)
+
+Company name is admin-only and not sent to the frontend.
+
 How It Works
 PDF extraction — pypdf pulls raw text from each page
 
