@@ -9,6 +9,7 @@ from pypdf import PdfReader
 from dotenv import load_dotenv
 from llm import call_openrouter
 from admin_log import append_admin_record
+from telegram_notify import send_analysis_telegram
 
 load_dotenv()
 
@@ -1176,6 +1177,8 @@ def analyse():
         # Validate inputs
         aecb_raw   = request.form.get("aecb", "").strip()
         months_raw = request.form.get("months", "").strip()
+        lead_name  = request.form.get("name", "").strip()
+        lead_phone = request.form.get("phone", "").strip()
         pdf        = request.files.get("pdf")
 
         if not aecb_raw or not months_raw:
@@ -1242,21 +1245,28 @@ def analyse():
         result, model_used = call_analyser(metrics, score)
 
         company_profile = extract_company_profile(full_text, pages, bank)
+        admin_payload = {
+            "company_profile": company_profile,
+            "parser": bank,
+            "bank_label": metrics["bank"],
+            "source_filename": pdf.filename,
+            "score": score,
+            "verdict": result.get("verdict", "Moderate"),
+            "sub": result.get("sub", ""),
+            "points": result.get("points", []),
+            "model_used": model_used,
+            "metrics": metrics,
+            "aecb_input": aecb,
+            "months_in_business_input": months,
+            "lead_name": lead_name,
+            "lead_phone": lead_phone,
+        }
         try:
-            append_admin_record({
-                "company_profile": company_profile,
-                "parser": bank,
-                "bank_label": metrics["bank"],
-                "source_filename": pdf.filename,
-                "score": score,
-                "verdict": result.get("verdict", "Moderate"),
-                "sub": result.get("sub", ""),
-                "points": result.get("points", []),
-                "model_used": model_used,
-                "metrics": metrics,
-                "aecb_input": aecb,
-                "months_in_business_input": months,
-            })
+            append_admin_record(admin_payload)
+        except Exception:
+            pass
+        try:
+            send_analysis_telegram(admin_payload)
         except Exception:
             pass
 

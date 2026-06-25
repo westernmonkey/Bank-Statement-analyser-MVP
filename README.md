@@ -67,6 +67,7 @@ The pipeline extracts transaction-level signals from UAE bank statements, comput
 
 ### Operations
 - Structured admin audit trail (JSON, JSONL, and human-readable log)
+- Telegram notifications on successful analysis (optional)
 - OpenRouter key rotation with rate limiting
 - Rule-based LLM fallback when the API is unavailable
 
@@ -88,25 +89,28 @@ flowchart LR
         SCR[Rule-Based Scorer]
         LLM[OpenRouter LLM]
         ADM[admin_log.py]
+        TG[telegram_notify.py]
     end
 
     UI -->|multipart POST| API
     API --> PDF --> DET --> PAR --> SCR
     SCR --> LLM
     SCR --> ADM
+    SCR --> TG
     LLM -->|JSON response| UI
     ADM -->|admin files| LOG[(admin_analyses.*)]
+    TG -->|sendMessage| BOT[Telegram]
 ```
 
 **Request flow**
 
-1. User uploads PDF + enters AECB score and months in business.
+1. User enters name, phone, AECB score, and months in business; uploads PDF.
 2. Backend extracts text per page; rejects scanned/image-only PDFs.
 3. Bank is detected; the matching parser extracts header balances and transaction blocks.
 4. Transaction scanner computes risk metrics (bounces, cash mix, ATM, payers, etc.).
 5. `compute_score()` applies weighted rules → numeric score.
 6. LLM receives **aggregated public metrics only** → verdict, summary, four points.
-7. Company profile is logged server-side; public JSON response excludes it.
+7. Company profile and lead details are logged server-side; Telegram alert is sent if configured.
 8. Frontend renders results and offers PDF export via browser print.
 
 ---
@@ -118,6 +122,7 @@ Bank-Statement-Analyser/
 ├── backend.py              # Flask app, parsers, scoring, /analyse endpoint
 ├── llm.py                  # OpenRouter client, rate limiting, model routing
 ├── admin_log.py            # Admin audit trail (JSON / JSONL / tabular log)
+├── telegram_notify.py      # Telegram lead notifications on successful analysis
 ├── model_routing.json      # LLM model selection per role
 ├── linkit-analyser.html    # Frontend UI
 ├── assets/
@@ -220,11 +225,22 @@ Edit `model_routing.json` to change the LLM used for narrative generation:
 
 Fallback chain: configured model → `openrouter/free` → rule-based text fallback.
 
+### Telegram notifications (optional)
+
+On every successful analysis, the backend sends a formatted text summary to your Telegram chat (lead info, company from PDF, score, metrics, AI observations). Failures are logged and never block the user response.
+
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_CHAT_ID` | Destination chat ID (e.g. `531306519`) |
+
+If either variable is unset, notifications are skipped silently.
+
 ---
 
 ## Usage
 
-1. Enter your **AECB credit score** (300–900) and **months in business**.
+1. Enter your **name**, **phone number**, **AECB credit score** (300–900), and **months in business**.
 2. Upload a **digital PDF** bank statement (any supported UAE bank).
 3. Click **Analyse My Statement**.
 4. Review your fundability score, metrics, and AI observations.
@@ -243,6 +259,8 @@ Analyse a bank statement and return a fundability assessment.
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `pdf` | file | Yes | Bank statement PDF |
+| `name` | string | No | Contact name (sent to Telegram admin alert) |
+| `phone` | string | No | Contact phone (sent to Telegram admin alert) |
 | `aecb` | integer | Yes | AECB credit score (300–900) |
 | `months` | integer | Yes | Months in business (≥1) |
 
