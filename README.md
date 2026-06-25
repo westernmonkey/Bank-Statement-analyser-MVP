@@ -34,7 +34,7 @@ The Fundability Analyser is a lightweight full-stack tool consisting of:
 
 | Layer | Technology |
 |-------|------------|
-| **Frontend** | Single-page HTML/CSS/JS (`linkit-analyser.html`) |
+| **Frontend** | Single-page HTML/CSS/JS — served by Flask at `/` |
 | **Backend** | Python · Flask · Flask-CORS |
 | **PDF extraction** | `pypdf` + bank-specific regex parsers |
 | **Scoring** | Deterministic rule-based model (no LLM) |
@@ -77,11 +77,8 @@ The pipeline extracts transaction-level signals from UAE bank statements, comput
 
 ```mermaid
 flowchart LR
-    subgraph Client
-        UI[linkit-analyser.html]
-    end
-
-    subgraph Backend["Flask Backend :5001"]
+    subgraph App["Flask App :5001"]
+        UI["/  linkit-analyser.html"]
         API["/analyse"]
         PDF[pypdf Extract]
         DET[Bank Detection]
@@ -179,19 +176,13 @@ OR_KEY_2=sk-or-v1-...
 # Up to OR_KEY_5 supported for rotation
 ```
 
-### 4. Start the backend
+### 4. Start the app
 
 ```bash
 python backend.py
 ```
 
-The API listens on **http://localhost:5001**.
-
-### 5. Open the frontend
-
-Open `linkit-analyser.html` in your browser (double-click or serve via a local static server).
-
-> The frontend is configured to call `http://localhost:5001/analyse`. Update the `fetch` URL in `linkit-analyser.html` if you deploy the backend elsewhere.
+Open **http://localhost:5001** in your browser. Flask serves the UI and the `/analyse` API on the same port.
 
 ---
 
@@ -420,7 +411,7 @@ Every successful `/analyse` request appends a record to three gitignored files:
 
 | Issue | Solution |
 |-------|----------|
-| `Failed to fetch` / CORS error | Ensure `python backend.py` is running on port 5001 |
+| `Failed to fetch` / CORS error | Ensure `python backend.py` is running and you opened http://localhost:5001 |
 | Empty PDF export | Hard-refresh the page; allow pop-ups; enable **Background graphics** in print |
 | `No selectable text` error | Re-export a digital PDF from your bank’s online portal |
 | LLM returns generic fallback text | Check `.env` keys; review OpenRouter rate limits |

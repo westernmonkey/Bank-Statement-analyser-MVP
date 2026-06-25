@@ -838,7 +838,7 @@ async function startAnalysis() {
     formData.append('months', months);
     formData.append('pdf', file);
 
-    const resp = await fetch('http://localhost:5001/analyse', {
+    const resp = await fetch('/analyse', {
       method: 'POST',
       body: formData
     });

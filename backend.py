@@ -3,7 +3,9 @@ import re
 import json
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from flask import Flask, request, jsonify
+from pathlib import Path
+
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from pypdf import PdfReader
 from dotenv import load_dotenv
@@ -12,6 +14,8 @@ from admin_log import append_admin_record
 from telegram_notify import send_analysis_telegram
 
 load_dotenv()
+
+ROOT = Path(__file__).resolve().parent
 
 app = Flask(__name__)
 CORS(app)
@@ -1169,7 +1173,17 @@ def call_analyser(metrics: dict, score: int) -> tuple[dict, str]:
         return _rule_fallback(metrics, verdict), model_used
 
 
-# ── ENDPOINT ─────────────────────────────────────────────────────
+# ── ROUTES ───────────────────────────────────────────────────────
+
+@app.route("/")
+def index():
+    return send_from_directory(ROOT, "linkit-analyser.html")
+
+
+@app.route("/assets/<path:filename>")
+def assets(filename):
+    return send_from_directory(ROOT / "assets", filename)
+
 
 @app.route("/analyse", methods=["POST"])
 def analyse():
