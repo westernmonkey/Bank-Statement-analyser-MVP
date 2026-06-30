@@ -1001,6 +1001,9 @@ function showResults(m, r) {
     verdict: r.verdict,
     sub: r.sub,
     bank: m.bank,
+    companyName: r.company_name || '',
+    statementPeriod: r.statement_period || '',
+    logoUrl: `${window.location.origin}/assets/linkit-logo.png`,
     metrics,
     healthNotes: [...currencyHealthNotes, ...r.points],
     date: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -1018,6 +1021,8 @@ function escHtml(s) {
 function buildExportHtml(data) {
   const CALENDLY_URL = 'https://calendly.com/letslinkit-to-abhinav';
   const score = Math.min(100, Math.max(0, Number(data.score) || 0));
+  const scoreColor = score >= 70 ? '#1da75b' : score >= 45 ? '#b07c1f' : '#d63636';
+  const barTrack = '#dbeafe';
   const metricRows = data.metrics.map(mt => `
     <tr><td class="lbl">${escHtml(mt.label)}</td><td class="val">${escHtml(mt.value)}</td><td class="val assess">${escHtml(mt.flag)}</td></tr>`
   ).join('');
@@ -1025,62 +1030,108 @@ function buildExportHtml(data) {
     <tr><td class="lbl">Obs. ${i + 1}</td><td class="val" colspan="2">${escHtml(n)}</td></tr>
   `).join('');
 
+  const companyLine = data.companyName
+    ? `<div class="company-name">${escHtml(data.companyName)}</div>`
+    : '';
+  const periodLine = data.statementPeriod
+    ? `<div class="period-line">Statement period: <strong>${escHtml(data.statementPeriod)}</strong></div>`
+    : '';
+
   return `<!DOCTYPE html><html><head><title>Linkit Fundability Report</title>
 <style>
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
   @page { size: A4 portrait; margin: 10mm 12mm; }
-  html, body { height: 100%; }
   body {
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Plus Jakarta Sans', Arial, Helvetica, sans-serif;
     font-size: 9.5px;
-    line-height: 1.35;
+    line-height: 1.4;
     margin: 0;
     padding: 0;
-    color: #000;
+    color: #181c1c;
   }
-  h2 { text-align: center; font-size: 14px; margin: 0 0 2px; color: #222; }
-  .brand { text-align: center; font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; color: #666; }
-  .sub { text-align: center; font-size: 9.5px; margin: 0 0 8px; color: #555; }
-  .date-line { text-align: right; margin-bottom: 6px; font-size: 9px; color: #444; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 7px; }
-  td { padding: 3px 7px; vertical-align: top; font-size: 9.5px; }
-  .sh td { background: #333 !important; color: #fff !important; font-weight: bold; padding: 4px 7px; font-size: 9px; }
-  .lbl { width: 32%; font-weight: 600; background: #ececec !important; border: 1px solid #aaa; color: #222; }
-  .val { border: 1px solid #aaa; background: #fff; }
-  .assess { width: 22%; }
-  .score-wrap { margin: 0 0 8px; padding: 8px 10px; border: 1px solid #aaa; background: #f7f7f7 !important; }
-  .score-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
-  .score-num { font-size: 20px; font-weight: bold; color: #111; line-height: 1; }
-  .score-verdict { font-size: 11px; font-weight: bold; color: #333; }
-  .score-sub { font-size: 9px; color: #555; margin-bottom: 6px; }
-  .bar-svg { display: block; width: 100%; height: 12px; margin-top: 2px; }
-  .bar-labels { display: flex; justify-content: space-between; font-size: 8px; color: #666; margin-top: 3px; }
+  .report-header {
+    background: linear-gradient(135deg, #1c2434 0%, #2a3a52 100%);
+    color: #fff;
+    padding: 14px 16px 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .logo { height: 36px; width: auto; display: block; }
+  .header-meta { text-align: right; font-size: 8.5px; color: rgba(255,255,255,0.75); }
+  .report-title { font-size: 15px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.02em; }
+  .report-sub { font-size: 9.5px; color: rgba(255,255,255,0.82); margin: 0; }
+  .company-name {
+    margin-top: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .period-line {
+    margin-top: 4px;
+    font-size: 9.5px;
+    color: rgba(255,255,255,0.9);
+  }
+  .period-line strong { color: #93b4ff; font-weight: 600; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  td { padding: 4px 8px; vertical-align: top; font-size: 9.5px; }
+  .sh td {
+    background: #1c2434 !important;
+    color: #fff !important;
+    font-weight: 700;
+    padding: 5px 8px;
+    font-size: 9px;
+    letter-spacing: 0.02em;
+  }
+  .lbl { width: 32%; font-weight: 600; background: #f5f8ff !important; border: 1px solid #d6e2f0; color: #1c2434; }
+  .val { border: 1px solid #d6e2f0; background: #fff; }
+  .assess { width: 22%; color: #348180; font-weight: 600; }
+  .score-wrap {
+    margin: 0 0 8px;
+    padding: 10px 12px;
+    border: 1px solid #d6e2f0;
+    border-radius: 8px;
+    background: #f5f8ff !important;
+  }
+  .score-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .score-num { font-size: 22px; font-weight: 700; color: #1c2434; line-height: 1; }
+  .score-verdict { font-size: 11px; font-weight: 700; color: ${scoreColor}; }
+  .score-sub { font-size: 9px; color: #6b7a90; margin-bottom: 6px; }
+  .bar-svg { display: block; width: 100%; height: 14px; margin-top: 2px; border-radius: 4px; overflow: hidden; }
+  .bar-labels { display: flex; justify-content: space-between; font-size: 8px; color: #6b7a90; margin-top: 3px; }
   .cta {
     margin-top: 6px;
-    padding: 8px 10px;
-    border: 1.5px solid #333;
-    background: #f3f3f3 !important;
+    padding: 10px 12px;
+    border: 1px solid #2f6fed;
+    border-radius: 8px;
+    background: #f5f8ff !important;
     font-size: 9px;
-    line-height: 1.45;
+    line-height: 1.5;
   }
-  .cta strong { font-size: 10px; }
-  .cta a {
-    color: #1a4fb8;
-    font-weight: bold;
-    text-decoration: underline;
-    font-size: 10px;
-  }
-  .foot { margin-top: 6px; font-size: 8px; color: #777; text-align: center; }
-  @media print {
-    body { margin: 0; padding: 0; }
-    .page { page-break-after: avoid; page-break-inside: avoid; }
-  }
-</style></head><body>
+  .cta strong { font-size: 10px; color: #1c2434; }
+  .cta a { color: #2f6fed; font-weight: 700; text-decoration: none; font-size: 10px; }
+  .foot { margin-top: 8px; font-size: 8px; color: #6b7a90; text-align: center; }
+  @media print { body { margin: 0; padding: 0; } .page { page-break-inside: avoid; } }
+</style>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+</head><body>
 <div class="page">
-<div class="date-line">Date: ${escHtml(data.date)}</div>
-<div class="brand">Linkit</div>
-<h2>Fundability Analysis Report</h2>
-<p class="sub">${escHtml(data.bank)} · Statement Analysis Summary</p>
+<div class="report-header">
+  <div class="header-top">
+    <img class="logo" src="${escHtml(data.logoUrl)}" alt="Linkit">
+    <div class="header-meta">Generated ${escHtml(data.date)}</div>
+  </div>
+  <h2 class="report-title">Fundability Analysis Report</h2>
+  <p class="report-sub">${escHtml(data.bank)} · Statement Analysis Summary</p>
+  ${companyLine}
+  ${periodLine}
+</div>
 
 <div class="score-wrap">
   <div class="score-top">
@@ -1088,9 +1139,9 @@ function buildExportHtml(data) {
     <div class="score-verdict">${escHtml(data.verdict)}</div>
   </div>
   <div class="score-sub">${escHtml(data.sub)}</div>
-  <svg class="bar-svg" viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-    <rect x="0" y="0" width="100" height="12" fill="#dedede" stroke="#888" stroke-width="0.5"/>
-    <rect x="0" y="0" width="${score}" height="12" fill="#444444"/>
+  <svg class="bar-svg" viewBox="0 0 100 14" preserveAspectRatio="none" aria-hidden="true">
+    <rect x="0" y="0" width="100" height="14" fill="${barTrack}"/>
+    <rect x="0" y="0" width="${score}" height="14" fill="${scoreColor}" rx="1"/>
   </svg>
   <div class="bar-labels"><span>0 Low</span><span>45 Mod.</span><span>70 Strong</span><span>100</span></div>
 </div>

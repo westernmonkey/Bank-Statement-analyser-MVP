@@ -293,6 +293,73 @@ def extract_company_profile(full_text: str, pages: list, bank_id: str) -> dict:
     return result
 
 
+def extract_statement_period(full_text: str, pages: list, bank_id: str) -> dict:
+    """Extract statement start/end dates and a display label (per-bank regex)."""
+    page1 = pages[0] if pages else ""
+    start = end = ""
+
+    if bank_id == "adcb_detailed":
+        start_m = re.search(r"Start Date[:\s]+(\d{2}-\w+-\d{4})", page1, re.IGNORECASE)
+        end_m = re.search(r"End Date[:\s]+(\d{2}-\w+-\d{4})", page1, re.IGNORECASE)
+        if start_m:
+            start = start_m.group(1)
+        if end_m:
+            end = end_m.group(1)
+
+    elif bank_id in ("adcb_legacy", "adcb"):
+        period_m = re.search(
+            r"Statement Period\s+(\d{2}/\d{2}/\d{4})\s+To\s+(\d{2}/\d{2}/\d{4})",
+            page1, re.IGNORECASE,
+        )
+        if period_m:
+            start, end = period_m.group(1), period_m.group(2)
+
+    elif bank_id == "enbd":
+        period_m = re.search(
+            r"Statement Period\s+From\s+(\d{2}/\d{2}/\d{4})\s+to\s+(\d{2}/\d{2}/\d{4})",
+            full_text, re.IGNORECASE | re.DOTALL,
+        )
+        if not period_m:
+            period_m = re.search(
+                r"Statement Period[\s\S]{0,3000}?(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})",
+                full_text, re.IGNORECASE,
+            )
+        if period_m:
+            start, end = period_m.group(1), period_m.group(2)
+
+    elif bank_id == "rak":
+        period_m = re.search(
+            r"Statement Period:\s+(\d{2}-\w+-\d{4})\s+to\s+(\d{2}-\w+-\d{4})",
+            page1, re.IGNORECASE,
+        )
+        if period_m:
+            start, end = period_m.group(1), period_m.group(2)
+
+    elif bank_id == "wio":
+        period_m = re.search(
+            r"FROM\s+(\d{2}/\d{2}/\d{4})\s+TO\s+(\d{2}/\d{2}/\d{4})",
+            full_text, re.IGNORECASE,
+        )
+        if period_m:
+            start, end = period_m.group(1), period_m.group(2)
+
+    if not start or not end:
+        for pat in (
+            r"Start Date[:\s]+(\d{2}-\w+-\d{4})[\s\S]{0,120}?End Date[:\s]+(\d{2}-\w+-\d{4})",
+            r"Statement Period:\s+(\d{2}-\w+-\d{4})\s+to\s+(\d{2}-\w+-\d{4})",
+            r"Statement Period\s+(\d{2}/\d{2}/\d{4})\s+To\s+(\d{2}/\d{2}/\d{4})",
+            r"FROM\s+(\d{2}/\d{2}/\d{4})\s+TO\s+(\d{2}/\d{2}/\d{4})",
+            r"Statement Period[\s\S]{0,3000}?(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})",
+        ):
+            m = re.search(pat, full_text, re.IGNORECASE)
+            if m:
+                start, end = m.group(1), m.group(2)
+                break
+
+    display = f"{start} – {end}" if start and end else ""
+    return {"start": start, "end": end, "display": display}
+
+
 def extract_blocks_line_joined_generic(full_text: str) -> list:
     """Join multiline transactions for unknown banks using common date prefixes."""
     blocks = []
@@ -584,8 +651,11 @@ def parse_header_rak(page1: str, raw_blocks: list) -> dict:
 
 
 def parse_header_enbd(full_text: str, page1: str, raw_blocks: list) -> dict:
-    period_m = re.search(r"(\d{2}/\d{2}/\d{4})\s+(\d{2}/\d{2}/\d{4})", page1)
-    period_months = period_months_from_dates(period_m.group(1), period_m.group(2)) if period_m else 1
+    period_info = extract_statement_period(full_text, [page1], "enbd")
+    if period_info["start"] and period_info["end"]:
+        period_months = period_months_from_dates(period_info["start"], period_info["end"])
+    else:
+        period_months = 1
 
     bf_m = re.search(r"BROUGHT FORWARD\s+([\d,]+\.\d{2})Cr", full_text, re.IGNORECASE)
     opening_bal = float(bf_m.group(1).replace(",", "")) if bf_m else 0.0
@@ -1259,6 +1329,7 @@ def analyse():
         result, model_used = call_analyser(metrics, score)
 
         company_profile = extract_company_profile(full_text, pages, bank)
+        statement_period = extract_statement_period(full_text, pages, bank)
         admin_payload = {
             "company_profile": company_profile,
             "parser": bank,
@@ -1285,12 +1356,14 @@ def analyse():
             pass
 
         return jsonify({
-            "score":      score,
-            "metrics":    metrics,
-            "verdict":    result.get("verdict", "Moderate"),
-            "sub":        result.get("sub", ""),
-            "points":     result.get("points", []),
-            "model_used": model_used,
+            "score":            score,
+            "metrics":          metrics,
+            "verdict":          result.get("verdict", "Moderate"),
+            "sub":              result.get("sub", ""),
+            "points":           result.get("points", []),
+            "model_used":       model_used,
+            "company_name":     company_profile.get("name", ""),
+            "statement_period": statement_period.get("display", ""),
         })
 
     except Exception as e:
