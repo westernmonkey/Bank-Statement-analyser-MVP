@@ -85,8 +85,8 @@ flowchart LR
         PAR[Header + Transaction Parsers]
         SCR[Rule-Based Scorer]
         LLM[OpenRouter LLM]
-        ADM[admin_log.py]
-        TG[telegram_notify.py]
+        ADM[app.services.admin_log]
+        TG[app.services.telegram_notify]
     end
 
     UI -->|multipart POST| API
@@ -95,7 +95,7 @@ flowchart LR
     SCR --> ADM
     SCR --> TG
     LLM -->|JSON response| UI
-    ADM -->|admin files| LOG[(admin_analyses.*)]
+    ADM -->|admin files| LOG[(data/admin_analyses.*)]
     TG -->|sendMessage| BOT[Telegram]
 ```
 
@@ -116,24 +116,37 @@ flowchart LR
 
 ```
 Bank-Statement-Analyser/
-├── backend.py              # Flask app, parsers, scoring, /analyse endpoint
-├── llm.py                  # OpenRouter client, rate limiting, model routing
-├── admin_log.py            # Admin audit trail (JSON / JSONL / tabular log)
-├── telegram_notify.py      # Telegram lead notifications on successful analysis
-├── model_routing.json      # LLM model selection per role
-├── linkit-analyser.html    # Frontend UI
-├── assets/
-│   └── linkit-logo.png     # Linkit brand asset
-├── .env.example            # Environment variable template
-└── README.md
-```
-
-Generated at runtime (gitignored):
-
-```
-admin_analyses.json      # Formatted JSON array of all analyses
-admin_analyses.jsonl     # One JSON object per line
-admin_analyses.log       # Human-readable tabular report
+├── run.py                          # Entry point: python run.py
+├── requirements.txt                # Python dependencies
+├── .env.example                    # Environment variable template
+├── README.md
+├── app/
+│   ├── __init__.py                 # create_app(), path constants
+│   ├── routes.py                   # GET /, /assets, POST /analyse
+│   ├── parsing/
+│   │   ├── pdf.py                  # PDF extract, date helpers
+│   │   ├── banks.py                # Bank detection and labels
+│   │   ├── company.py              # Company name and statement period
+│   │   ├── blocks.py               # Transaction block splitting
+│   │   ├── headers.py              # Per-bank header parsers
+│   │   └── transactions.py         # Bounces, CDM, ATM, payers
+│   ├── scoring/
+│   │   └── score.py                # Rule-based fundability scoring
+│   └── services/
+│       ├── analyser.py             # LLM narrative generation
+│       ├── llm.py                  # OpenRouter client and routing
+│       ├── admin_log.py            # Admin audit trail
+│       └── telegram_notify.py      # Telegram notifications
+├── static/
+│   ├── linkit-analyser.html        # Frontend UI
+│   └── assets/
+│       └── linkit-logo.png         # Linkit brand asset
+├── config/
+│   └── model_routing.json          # LLM model selection per role
+└── data/                           # Runtime admin logs (gitignored)
+    ├── admin_analyses.json
+    ├── admin_analyses.jsonl
+    └── admin_analyses.log
 ```
 
 ---
@@ -159,7 +172,7 @@ cd Bank-Statement-analyser-MVP
 ### 2. Install Python dependencies
 
 ```bash
-pip install flask flask-cors pypdf httpx python-dotenv python-dateutil
+pip install -r requirements.txt
 ```
 
 ### 3. Configure environment variables
@@ -179,7 +192,7 @@ OR_KEY_2=sk-or-v1-...
 ### 4. Start the app
 
 ```bash
-python backend.py
+python run.py
 ```
 
 Open **http://localhost:5001** in your browser. Flask serves the UI and the `/analyse` API on the same port.
@@ -353,13 +366,13 @@ Verdict mapping:
 
 ## Admin Logging
 
-Every successful `/analyse` request appends a record to three gitignored files:
+Every successful `/analyse` request appends a record to three gitignored files under `data/`:
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `admin_analyses.json` | Indented JSON array | Structured review with `metrics_table`, `score`, `company`, `source` |
-| `admin_analyses.jsonl` | JSON Lines | Machine-readable stream, one object per analysis |
-| `admin_analyses.log` | Fixed-width text | Human-readable tabular report for quick scanning |
+| `data/admin_analyses.json` | Indented JSON array | Structured review with `metrics_table`, `score`, `company`, `source` |
+| `data/admin_analyses.jsonl` | JSON Lines | Machine-readable stream, one object per analysis |
+| `data/admin_analyses.log` | Fixed-width text | Human-readable tabular report for quick scanning |
 
 **Example JSON structure:**
 
@@ -411,7 +424,7 @@ Every successful `/analyse` request appends a record to three gitignored files:
 
 | Issue | Solution |
 |-------|----------|
-| `Failed to fetch` / CORS error | Ensure `python backend.py` is running and you opened http://localhost:5001 |
+| `Failed to fetch` / CORS error | Ensure `python run.py` is running and you opened http://localhost:5001 |
 | Empty PDF export | Hard-refresh the page; allow pop-ups; enable **Background graphics** in print |
 | `No selectable text` error | Re-export a digital PDF from your bank’s online portal |
 | LLM returns generic fallback text | Check `.env` keys; review OpenRouter rate limits |

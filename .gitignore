@@ -4,6 +4,4 @@ __pycache__/
 .DS_Store
 *.pdf
 *.xlsx
-admin_analyses.jsonl
-admin_analyses.json
-admin_analyses.log
+data/

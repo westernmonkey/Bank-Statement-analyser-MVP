@@ -3,13 +3,14 @@
 import json
 import os
 import time
-from pathlib import Path
 from threading import Lock
 
 import httpx
 
+from app import CONFIG_DIR
+
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-ROUTING_PATH = Path(__file__).resolve().parent / "model_routing.json"
+ROUTING_PATH = CONFIG_DIR / "model_routing.json"
 
 DEFAULT_ROUTING = {
     "analyser": "openai/gpt-oss-120b:free",
@@ -123,8 +124,6 @@ def call_openrouter(
         if m not in models_to_try:
             models_to_try.append(m)
 
-    max_retries = _env_int("OR_MAX_RETRIES_PER_KEY", 3)
-    retry_delay = _env_int("OR_RETRY_DELAY_SECONDS", 10)
     last_err = "request_failed"
 
     for try_model in models_to_try:

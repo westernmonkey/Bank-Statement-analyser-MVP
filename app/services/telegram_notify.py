@@ -162,7 +162,7 @@ def send_analysis_telegram(record: dict) -> None:
         text = format_analysis_telegram(payload)
         url = f"https://api.telegram.org/bot{token}/sendMessage"
 
-        for i, chunk in enumerate(_split_message(text)):
+        for chunk in _split_message(text):
             res = httpx.post(
                 url,
                 json={

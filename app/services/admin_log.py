@@ -2,12 +2,12 @@
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 
-LOG_DIR = Path(__file__).resolve().parent
-JSONL_PATH = LOG_DIR / "admin_analyses.jsonl"
-JSON_PATH = LOG_DIR / "admin_analyses.json"
-TABLE_PATH = LOG_DIR / "admin_analyses.log"
+from app import DATA_DIR
+
+JSONL_PATH = DATA_DIR / "admin_analyses.jsonl"
+JSON_PATH = DATA_DIR / "admin_analyses.json"
+TABLE_PATH = DATA_DIR / "admin_analyses.log"
 
 
 def _pad(label: str, width: int = 28) -> str:

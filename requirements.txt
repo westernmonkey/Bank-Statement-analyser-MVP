@@ -1,0 +1,6 @@
+flask
+flask-cors
+pypdf
+httpx
+python-dotenv
+python-dateutil
