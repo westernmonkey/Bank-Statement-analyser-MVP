@@ -40,7 +40,7 @@ The Fundability Analyser is a lightweight full-stack tool consisting of:
 | **Scoring** | Deterministic rule-based model (no LLM) |
 | **Narrative layer** | OpenRouter LLM with model routing & fallbacks |
 
-The pipeline extracts transaction-level signals from UAE bank statements, computes a weighted fundability score aligned with common lender thresholds, and uses an LLM to produce a diplomatic verdict and four factual observations. Company names extracted from statements are **admin-only** and never exposed to the end user.
+The pipeline extracts transaction-level signals from UAE bank statements, computes a weighted fundability score aligned with common lender thresholds, and uses an LLM to produce a diplomatic verdict and four factual observations. Company names extracted from statements are **admin-only** and never exposed to the end user..........
 
 ---
 
